@@ -4,8 +4,9 @@
 #include "globals.h"
 
 // ============================================
-// Baseline Persistence (NVS)
+// NVS Persistence
 // ============================================
+
 void saveBaseline() {
     prefs.begin("baseline", false);
     prefs.putBool("complete", baselineComplete);
@@ -39,7 +40,7 @@ void loadBaseline() {
             baselines[i].peak_mean = prefs.getFloat((p + "pm").c_str(), 0);
             baselines[i].peak_std  = prefs.getFloat((p + "ps").c_str(), 0.0001f);
         }
-        Serial.println("[NVS] Baseline loaded — anomaly detection ACTIVE");
+        Serial.println("[NVS] Baseline loaded, anomaly detection ACTIVE");
     } else {
         Serial.println("[NVS] No saved baseline");
     }
@@ -61,6 +62,7 @@ void resetBaselineData() {
 // ============================================
 // Baseline Learning
 // ============================================
+
 void updateBaseline(int slaveIdx) {
     BaselineData& b = baselines[slaveIdx];
     SlaveData& s = slaves[slaveIdx];
@@ -75,6 +77,7 @@ void updateBaseline(int slaveIdx) {
     }
 
     if (b.count >= BASELINE_CYCLES) {
+        // Compute mean
         b.f1_mean = 0; b.rms_mean = 0; b.peak_mean = 0;
         for (int i = 0; i < BASELINE_CYCLES; i++) {
             b.f1_mean   += b.f1_history[i];
@@ -85,6 +88,7 @@ void updateBaseline(int slaveIdx) {
         b.rms_mean /= BASELINE_CYCLES;
         b.peak_mean /= BASELINE_CYCLES;
 
+        // Compute std deviation
         b.f1_std = 0; b.rms_std = 0; b.peak_std = 0;
         for (int i = 0; i < BASELINE_CYCLES; i++) {
             float d;
@@ -96,24 +100,26 @@ void updateBaseline(int slaveIdx) {
         b.rms_std  = sqrtf(b.rms_std / BASELINE_CYCLES);
         b.peak_std = sqrtf(b.peak_std / BASELINE_CYCLES);
 
+        // Clamp minimum std to avoid division by zero
         if (b.f1_std < 0.01f)     b.f1_std = 0.01f;
         if (b.rms_std < 0.0001f)  b.rms_std = 0.0001f;
         if (b.peak_std < 0.0001f) b.peak_std = 0.0001f;
 
         b.ready = true;
-        Serial.print("[BASELINE] Slave ");
+        Serial.print("[BASELINE] S");
         Serial.print(slaveIdx + 1);
         Serial.print(" COMPLETE: f1=");
         Serial.print(b.f1_mean, 2);
-        Serial.print("±");
+        Serial.print(" +/- ");
         Serial.print(b.f1_std, 2);
         Serial.println(" Hz");
     }
 }
 
 // ============================================
-// Anomaly Detection (3σ)
+// 3-Sigma Anomaly Detection
 // ============================================
+
 int checkAnomaly(int slaveIdx) {
     BaselineData& b = baselines[slaveIdx];
     SlaveData& s = slaves[slaveIdx];
@@ -122,31 +128,34 @@ int checkAnomaly(int slaveIdx) {
     int alert = ALERT_NORMAL;
     s.alertReasons = "";
 
+    // Frequency shift check
     float f1_dev = fabsf(s.topFreqsZ[0] - b.f1_mean) / b.f1_std;
     if (f1_dev > ANOMALY_SIGMA * 2) {
         alert = ALERT_CRITICAL;
-        s.alertReasons += "FREQ_SHIFT(" + String(f1_dev, 1) + "σ) ";
+        s.alertReasons += "FREQ_SHIFT(" + String(f1_dev, 1) + "s) ";
     } else if (f1_dev > ANOMALY_SIGMA) {
         alert = max(alert, ALERT_WARNING);
-        s.alertReasons += "freq(" + String(f1_dev, 1) + "σ) ";
+        s.alertReasons += "freq(" + String(f1_dev, 1) + "s) ";
     }
 
+    // RMS vibration check
     float rms_dev = fabsf(s.rmsZ - b.rms_mean) / b.rms_std;
     if (rms_dev > ANOMALY_SIGMA * 2) {
         alert = max(alert, ALERT_CRITICAL);
-        s.alertReasons += "HIGH_VIB(" + String(rms_dev, 1) + "σ) ";
+        s.alertReasons += "HIGH_VIB(" + String(rms_dev, 1) + "s) ";
     } else if (rms_dev > ANOMALY_SIGMA) {
         alert = max(alert, ALERT_WARNING);
-        s.alertReasons += "vib(" + String(rms_dev, 1) + "σ) ";
+        s.alertReasons += "vib(" + String(rms_dev, 1) + "s) ";
     }
 
+    // Peak impact check
     float peak_dev = fabsf(s.peakZ - b.peak_mean) / b.peak_std;
     if (peak_dev > ANOMALY_SIGMA * 2) {
         alert = max(alert, ALERT_CRITICAL);
-        s.alertReasons += "IMPACT(" + String(peak_dev, 1) + "σ) ";
+        s.alertReasons += "IMPACT(" + String(peak_dev, 1) + "s) ";
     } else if (peak_dev > ANOMALY_SIGMA) {
         alert = max(alert, ALERT_WARNING);
-        s.alertReasons += "impact(" + String(peak_dev, 1) + "σ) ";
+        s.alertReasons += "impact(" + String(peak_dev, 1) + "s) ";
     }
 
     return alert;

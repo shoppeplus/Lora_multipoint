@@ -10,7 +10,9 @@ void initHannWindow() {
     }
 }
 
+// Cooley-Tukey Radix-2 in-place FFT
 static void fft(float* real, float* imag, int n) {
+    // Bit-reversal permutation
     int j = 0;
     for (int i = 1; i < n - 1; i++) {
         int bit = n >> 1;
@@ -22,6 +24,7 @@ static void fft(float* real, float* imag, int n) {
         }
     }
 
+    // Butterfly stages
     for (int len = 2; len <= n; len <<= 1) {
         float angle = -2.0f * PI / len;
         float wReal = cosf(angle);
@@ -47,12 +50,12 @@ static void fft(float* real, float* imag, int n) {
 
 void processAxisFFT(float* axisSamples, float* outFreqs, int numFreqs,
                     float* outRms, float* outPeak, float* outCF) {
-    // 1. DC removal (trừ gravity)
+    // 1. DC removal
     float mean = 0;
     for (int i = 0; i < SAMPLE_SIZE; i++) mean += axisSamples[i];
     mean /= SAMPLE_SIZE;
 
-    // 2. Peak + RMS (sau DC removal)
+    // 2. RMS + Peak (on AC signal)
     float rmsVal = 0;
     float peakVal = 0;
     for (int i = 0; i < SAMPLE_SIZE; i++) {
@@ -83,7 +86,7 @@ void processAxisFFT(float* axisSamples, float* outFreqs, int numFreqs,
         vReal[i] = sqrtf(vReal[i] * vReal[i] + vImag[i] * vImag[i]);
     }
 
-    // 6. Peak finding (noise floor)
+    // 6. Find top frequency peaks (above noise floor, min distance apart)
     int freqBins[NUM_TOP_FREQS];
     for (int p = 0; p < numFreqs; p++) {
         float maxMag = 0;

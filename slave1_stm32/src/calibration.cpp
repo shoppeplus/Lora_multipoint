@@ -1,7 +1,7 @@
 #include "calibration.h"
 #include "mpu6050.h"
 
-// Axis mapping defaults: physical Z = vertical
+// Default axis mapping: physical Z = vertical
 int gravAxis  = 2;
 int horzAxis1 = 0;
 int horzAxis2 = 1;
@@ -34,22 +34,20 @@ void calibrateOrientation() {
 
     gravAxis = maxAxis;
 
+    // Assign remaining axes as horizontal
     int h = 0;
     int hAxes[2];
     for (int i = 0; i < 3; i++) {
-        if (i != gravAxis) {
-            hAxes[h++] = i;
-        }
+        if (i != gravAxis) hAxes[h++] = i;
     }
     horzAxis1 = hAxes[0];
     horzAxis2 = hAxes[1];
 
     Serial.println("[CALIB] Raw means:");
-    Serial.print("  Physical X: "); Serial.print(mean[0], 4); Serial.println(" g");
-    Serial.print("  Physical Y: "); Serial.print(mean[1], 4); Serial.println(" g");
-    Serial.print("  Physical Z: "); Serial.print(mean[2], 4); Serial.println(" g");
-    Serial.println();
-    Serial.print("[CALIB] Gravity on phys.");
+    Serial.print("  X: "); Serial.print(mean[0], 4); Serial.println(" g");
+    Serial.print("  Y: "); Serial.print(mean[1], 4); Serial.println(" g");
+    Serial.print("  Z: "); Serial.print(mean[2], 4); Serial.println(" g");
+    Serial.print("[CALIB] Gravity on ");
     Serial.print(axisNames[gravAxis]);
     Serial.print(" (mean="); Serial.print(mean[gravAxis], 4); Serial.println("g)");
     Serial.print("[CALIB] Map: V=");

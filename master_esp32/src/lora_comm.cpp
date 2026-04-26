@@ -5,8 +5,9 @@
 #include "wifi_manager.h"
 
 // ============================================
-// Polling with Retry
+// Poll Slave (with retry)
 // ============================================
+
 bool pollSlave(uint8_t slaveId) {
     int idx = slaveId - 1;
     slaves[idx].totalPolls++;
@@ -41,6 +42,7 @@ bool pollSlave(uint8_t slaveId) {
                 if (response.startsWith("DATA:")) {
                     String data = response.substring(5);
 
+                    // Count commas to determine protocol version
                     int commas[14];
                     int commaCount = 0;
                     for (int i = 0; i < (int)data.length() && commaCount < 14; i++) {
@@ -54,7 +56,7 @@ bool pollSlave(uint8_t slaveId) {
 
                         if (id == slaveId) {
                             if (commaCount == 14) {
-                                // v3.2: 15 fields
+                                // v3.2: id,seq,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert,f1x,rmsX,peakX,f1y,rmsY,peakY
                                 slaves[idx].lastSeqRecv     = data.substring(commas[0] + 1, commas[1]).toInt();
                                 slaves[idx].topFreqsZ[0]    = data.substring(commas[1] + 1, commas[2]).toFloat();
                                 slaves[idx].topFreqsZ[1]    = data.substring(commas[2] + 1, commas[3]).toFloat();
@@ -70,7 +72,7 @@ bool pollSlave(uint8_t slaveId) {
                                 slaves[idx].rmsY            = data.substring(commas[12] + 1, commas[13]).toFloat();
                                 slaves[idx].peakY           = data.substring(commas[13] + 1).toFloat();
                             } else if (commaCount == 10) {
-                                // v3.0 compat
+                                // v3.0: id,seq,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert,rmsX,rmsY
                                 slaves[idx].lastSeqRecv     = data.substring(commas[0] + 1, commas[1]).toInt();
                                 slaves[idx].topFreqsZ[0]    = data.substring(commas[1] + 1, commas[2]).toFloat();
                                 slaves[idx].topFreqsZ[1]    = data.substring(commas[2] + 1, commas[3]).toFloat();
@@ -84,7 +86,7 @@ bool pollSlave(uint8_t slaveId) {
                                 slaves[idx].freqX = 0; slaves[idx].peakX = 0;
                                 slaves[idx].freqY = 0; slaves[idx].peakY = 0;
                             } else {
-                                // v2.0 compat
+                                // v2.0: id,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert
                                 slaves[idx].topFreqsZ[0]    = data.substring(commas[0] + 1, commas[1]).toFloat();
                                 slaves[idx].topFreqsZ[1]    = data.substring(commas[1] + 1, commas[2]).toFloat();
                                 slaves[idx].topFreqsZ[2]    = data.substring(commas[2] + 1, commas[3]).toFloat();
@@ -114,8 +116,9 @@ bool pollSlave(uint8_t slaveId) {
 }
 
 // ============================================
-// Recalibrate (safe for WDT)
+// Sequential Recalibrate (WDT-safe)
 // ============================================
+
 void performRecalibrate() {
     Serial.println("[CMD] Recalibrating all slaves...");
     calibResult = "";
@@ -138,11 +141,11 @@ void performRecalibrate() {
             LoRa.receive();
 
             Serial.print("[CMD] Sent "); Serial.print(cmd);
-            Serial.print(" → waiting... ");
+            Serial.print(" > waiting... ");
 
             unsigned long start = millis();
             while (millis() - start < 4000) {
-                yield();
+                yield();  // Feed WDT
                 int ps = LoRa.parsePacket();
                 if (ps > 0) {
                     String msg = "";
@@ -182,15 +185,16 @@ void performRecalibrate() {
 }
 
 // ============================================
-// Serial Dashboard
+// Serial Monitor Output
 // ============================================
+
 void printResults() {
     int onlineCount = 0, warningCount = 0, criticalCount = 0;
     bool hasAlerts = false;
 
     Serial.println();
-    Serial.println("╔══════════════════════════════════════════════════════════════════════════╗");
-    Serial.print("║  BRIDGE MONITOR v3.2 [Cycle #");
+    Serial.println("========================================================================");
+    Serial.print("  BRIDGE MONITOR v3.2 [Cycle #");
     Serial.print(cycleCount);
     Serial.print("]  Up: ");
     Serial.print(millis() / 1000);
@@ -199,7 +203,7 @@ void printResults() {
     if (t.length() > 0) { Serial.print("  | "); Serial.print(t); }
     Serial.println();
 
-    Serial.print("║  Mode: ");
+    Serial.print("  Mode: ");
     if (!baselineComplete) {
         int mc = BASELINE_CYCLES;
         for (int i = 0; i < NUM_SLAVES; i++) {
@@ -210,13 +214,13 @@ void printResults() {
     } else {
         Serial.println("MONITORING");
     }
-    Serial.print("║  Web: http://"); Serial.print(apIP);
+    Serial.print("  Web: http://"); Serial.print(apIP);
     if (staIP.length() > 0) { Serial.print(" | http://"); Serial.print(staIP); }
     Serial.println();
-    Serial.println("╠══════════════════════════════════════════════════════════════════════════╣");
+    Serial.println("------------------------------------------------------------------------");
 
     for (int i = 0; i < NUM_SLAVES; i++) {
-        Serial.print("║  Slave "); Serial.print(i + 1); Serial.print(": ");
+        Serial.print("  Slave "); Serial.print(i + 1); Serial.print(": ");
 
         if (slaves[i].online) {
             onlineCount++;
@@ -225,20 +229,20 @@ void printResults() {
             Serial.print("  f3="); Serial.print(slaves[i].topFreqsZ[2], 2);
             Serial.println(" Hz");
 
-            Serial.print("║         Z: RMS="); Serial.print(slaves[i].rmsZ, 4);
+            Serial.print("          Z: RMS="); Serial.print(slaves[i].rmsZ, 4);
             Serial.print(" | Peak="); Serial.print(slaves[i].peakZ, 4);
             Serial.print(" | CF="); Serial.print(slaves[i].crestFactorZ, 2);
             Serial.print(" | "); Serial.print(slaves[i].rssi); Serial.println(" dBm");
 
-            Serial.print("║         X: f1="); Serial.print(slaves[i].freqX, 2);
+            Serial.print("          X: f1="); Serial.print(slaves[i].freqX, 2);
             Serial.print(" Hz | RMS="); Serial.print(slaves[i].rmsX, 4);
             Serial.print(" | Peak="); Serial.print(slaves[i].peakX, 4); Serial.println(" g");
 
-            Serial.print("║         Y: f1="); Serial.print(slaves[i].freqY, 2);
+            Serial.print("          Y: f1="); Serial.print(slaves[i].freqY, 2);
             Serial.print(" Hz | RMS="); Serial.print(slaves[i].rmsY, 4);
             Serial.print(" | Peak="); Serial.print(slaves[i].peakY, 4); Serial.println(" g");
 
-            Serial.print("║         Pkt: ");
+            Serial.print("          Pkt: ");
             Serial.print(slaves[i].successPolls); Serial.print("/");
             Serial.print(slaves[i].totalPolls);
             if (slaves[i].totalPolls > 0) {
@@ -247,7 +251,7 @@ void printResults() {
             }
             Serial.println();
 
-            Serial.print("║         ");
+            Serial.print("          ");
             if (slaves[i].finalAlert == ALERT_CRITICAL) {
                 Serial.print("!!! CRITICAL !!! "); criticalCount++; hasAlerts = true;
             } else if (slaves[i].finalAlert == ALERT_WARNING) {
@@ -265,15 +269,15 @@ void printResults() {
             if (off > 0) { Serial.print(" ("); Serial.print(off); Serial.print("s ago)"); }
             Serial.println();
         }
-        if (i < NUM_SLAVES - 1) Serial.println("║");
+        if (i < NUM_SLAVES - 1) Serial.println();
     }
 
-    Serial.println("╠══════════════════════════════════════════════════════════════════════════╣");
-    Serial.print("║  "); Serial.print(onlineCount); Serial.print("/");
+    Serial.println("------------------------------------------------------------------------");
+    Serial.print("  "); Serial.print(onlineCount); Serial.print("/");
     Serial.print(NUM_SLAVES); Serial.print(" ONLINE");
     if (criticalCount > 0) { Serial.print(" | "); Serial.print(criticalCount); Serial.print(" CRIT"); }
     if (warningCount > 0) { Serial.print(" | "); Serial.print(warningCount); Serial.print(" WARN"); }
-    if (!hasAlerts && onlineCount == NUM_SLAVES) Serial.print("  ★ ALL NORMAL ★");
+    if (!hasAlerts && onlineCount == NUM_SLAVES) Serial.print("  * ALL NORMAL *");
     Serial.println();
-    Serial.println("╚══════════════════════════════════════════════════════════════════════════╝");
+    Serial.println("========================================================================");
 }

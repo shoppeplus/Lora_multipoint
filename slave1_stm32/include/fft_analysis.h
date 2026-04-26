@@ -4,15 +4,15 @@
 #include <Arduino.h>
 #include "config.h"
 
-// FFT buffers (shared)
+// Shared FFT buffers
 extern float vReal[SAMPLE_SIZE];
 extern float vImag[SAMPLE_SIZE];
 extern float hannWindow[SAMPLE_SIZE];
 
-// Khởi tạo Hann window
+// Pre-compute Hann window coefficients
 void initHannWindow();
 
-// FFT + peak detection + RMS/Peak/CF (tất cả sau DC removal)
+// Full axis processing: DC removal → RMS/Peak/CF → Hann → FFT → peak finding
 void processAxisFFT(float* axisSamples, float* outFreqs, int numFreqs,
                     float* outRms, float* outPeak, float* outCF);
 

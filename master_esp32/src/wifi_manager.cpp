@@ -11,12 +11,12 @@ void setupWiFi() {
     apIP = WiFi.softAPIP().toString();
     Serial.print("[WIFI] AP: ");
     Serial.print(WIFI_AP_SSID);
-    Serial.print(" → http://");
+    Serial.print(" > http://");
     Serial.println(apIP);
 
     String ssid = WIFI_STA_SSID;
     if (ssid.length() > 0) {
-        Serial.print("[WIFI] STA → ");
+        Serial.print("[WIFI] STA > ");
         Serial.print(WIFI_STA_SSID);
         WiFi.begin(WIFI_STA_SSID, WIFI_STA_PASS);
         int attempts = 0;
@@ -27,7 +27,7 @@ void setupWiFi() {
         }
         if (WiFi.status() == WL_CONNECTED) {
             staIP = WiFi.localIP().toString();
-            Serial.print(" OK → http://");
+            Serial.print(" OK > http://");
             Serial.println(staIP);
         } else {
             Serial.println(" FAILED (AP-only)");

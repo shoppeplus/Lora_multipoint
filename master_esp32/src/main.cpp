@@ -1,14 +1,12 @@
 /**
  * ============================================
- * MASTER ESP32 - Bridge Vibration Monitor v3.2
+ * MASTER ESP32 — Bridge Vibration Monitor v3.2
  * ============================================
- * 
- * Modules:
- *   globals      — Biến toàn cục, data structures
- *   wifi_manager — WiFi AP+STA, NTP
- *   web_server   — Dashboard + REST API
- *   lora_comm    — LoRa polling, recalibrate, serial print
- *   baseline     — Baseline learning, anomaly detection, NVS
+ *
+ * Architecture: Always-On polling + Web Dashboard
+ * - Polls 2 slaves via LoRa every ~1s
+ * - Baseline learning + 3-sigma anomaly detection
+ * - WiFi AP+STA with async web dashboard
  */
 
 #include <Arduino.h>
@@ -21,24 +19,21 @@
 #include "lora_comm.h"
 #include "baseline.h"
 
-// ============================================
-// Setup
-// ============================================
 void setup() {
     Serial.begin(SERIAL_BAUD);
     delay(1000);
 
     Serial.println();
-    Serial.println("╔══════════════════════════════════════════╗");
-    Serial.println("║  BRIDGE VIBRATION MONITOR v3.2 - MASTER ║");
-    Serial.println("║  Always-On + Multi-Axis FFT + Dashboard  ║");
-    Serial.println("╚══════════════════════════════════════════╝");
+    Serial.println("========================================");
+    Serial.println("  BRIDGE VIBRATION MONITOR v3.2 MASTER");
+    Serial.println("  Always-On + Multi-Axis + Dashboard");
+    Serial.println("========================================");
     Serial.println();
 
     // LoRa
     SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
     LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
-    Serial.print("[INIT] LoRa 433 MHz... ");
+    Serial.print("[INIT] LoRa 433MHz... ");
     if (!LoRa.begin(LORA_FREQ)) {
         Serial.println("FAILED!");
         while (1) { delay(1000); }
@@ -62,15 +57,12 @@ void setup() {
     setupWebServer();
     loadBaseline();
 
-    Serial.println("[INIT] v3.2 Always-On (2 slaves) ready");
+    Serial.println("[INIT] Ready");
     Serial.println();
 }
 
-// ============================================
-// Main Loop
-// ============================================
 void loop() {
-    // Recalibrate (non-blocking, safe for WDT)
+    // Handle recalibrate request (non-blocking, WDT-safe)
     if (needRecalibrate) {
         performRecalibrate();
         return;
@@ -106,7 +98,7 @@ void loop() {
         if (allReady) {
             baselineComplete = true;
             saveBaseline();
-            Serial.println("★ BASELINE COMPLETE — Anomaly detection ACTIVE ★");
+            Serial.println("* BASELINE COMPLETE — Anomaly detection ACTIVE *");
         }
     }
 

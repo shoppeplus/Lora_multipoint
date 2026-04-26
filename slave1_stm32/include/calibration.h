@@ -4,13 +4,13 @@
 #include <Arduino.h>
 #include "config.h"
 
-// Axis mapping globals
-extern int gravAxis;
-extern int horzAxis1;
-extern int horzAxis2;
+// Axis mapping (set by calibrateOrientation)
+extern int gravAxis;       // Physical axis with gravity → logical Z
+extern int horzAxis1;      // Horizontal axis 1 → logical X
+extern int horzAxis2;      // Horizontal axis 2 → logical Y
 extern const char* axisNames[];
 
-// Tự phát hiện trục gravity và remap tọa độ
+// Detect gravity axis from 100 samples, remap logical axes
 void calibrateOrientation();
 
 #endif

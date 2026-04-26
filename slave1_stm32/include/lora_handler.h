@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-// Kiểm tra và xử lý LoRa request (REQ + CALIB)
+// Handle incoming LoRa packets (REQ polling + CALIB commands)
 bool checkAndRespond();
 
 #endif

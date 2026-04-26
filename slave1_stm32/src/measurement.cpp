@@ -3,20 +3,20 @@
 #include "fft_analysis.h"
 #include "calibration.h"
 
-// === Sample buffers ===
+// Sample buffers
 float samples[SAMPLE_SIZE];
 #if ENABLE_MULTI_AXIS
 float samplesX[SAMPLE_SIZE];
 float samplesY[SAMPLE_SIZE];
 #endif
 
-// === Raw results (trước EMA) ===
+// Raw results (before EMA)
 static float rawFreqsZ[NUM_TOP_FREQS];
 static float rawRmsZ = 0, rawPeakZ = 0, rawCfZ = 0;
 static float rawFreqX = 0, rawRmsX = 0, rawPeakX = 0;
 static float rawFreqY = 0, rawRmsY = 0, rawPeakY = 0;
 
-// === Smoothed results (sau EMA, output) ===
+// Smoothed results (after EMA, exported)
 float topFreqsZ[NUM_TOP_FREQS] = {0};
 float rmsZ = 0, peakZ = 0, crestFactorZ = 0;
 float topFreqX = 0, rmsX = 0, peakX = 0;
@@ -27,23 +27,17 @@ unsigned long measureCount = 0;
 bool dataReady = false;
 unsigned long lastMeasure = 0;
 
-// ============================================
-// EMA helper
-// ============================================
+// EMA: output = α × new + (1-α) × prev
 static float ema(float prev, float newVal, float alpha) {
     if (prev == 0) return newVal;
     return alpha * newVal + (1.0f - alpha) * prev;
 }
 
-// ============================================
-// Collect samples with axis remapping
-// ============================================
 void collectSamples() {
     unsigned long sampleInterval = 1000000UL / SAMPLE_RATE;
 
     for (int i = 0; i < SAMPLE_SIZE; i++) {
         unsigned long t = micros();
-
         float ax, ay, az;
         readAccelXYZ(ax, ay, az);
         float raw[3] = {ax, ay, az};
@@ -55,14 +49,10 @@ void collectSamples() {
 #else
         samples[i] = raw[gravAxis];
 #endif
-
         while ((micros() - t) < sampleInterval) {}
     }
 }
 
-// ============================================
-// Alert determination
-// ============================================
 static void determineAlertLevel() {
     alertLevel = ALERT_NORMAL;
 
@@ -80,9 +70,6 @@ static void determineAlertLevel() {
 #endif
 }
 
-// ============================================
-// Full measurement cycle
-// ============================================
 void performMeasurement() {
     collectSamples();
 
@@ -102,28 +89,22 @@ void performMeasurement() {
     determineAlertLevel();
 
     // EMA smoothing
-    for (int i = 0; i < NUM_TOP_FREQS; i++) {
+    for (int i = 0; i < NUM_TOP_FREQS; i++)
         topFreqsZ[i] = ema(topFreqsZ[i], rawFreqsZ[i], EMA_ALPHA);
-    }
-    rmsZ = ema(rmsZ, rawRmsZ, EMA_ALPHA);
-    peakZ = ema(peakZ, rawPeakZ, EMA_ALPHA);
+    rmsZ         = ema(rmsZ, rawRmsZ, EMA_ALPHA);
+    peakZ        = ema(peakZ, rawPeakZ, EMA_ALPHA);
     crestFactorZ = ema(crestFactorZ, rawCfZ, EMA_ALPHA);
-
-    topFreqX = ema(topFreqX, rawFreqX, EMA_ALPHA);
-    rmsX = ema(rmsX, rawRmsX, EMA_ALPHA);
-    peakX = ema(peakX, rawPeakX, EMA_ALPHA);
-
-    topFreqY = ema(topFreqY, rawFreqY, EMA_ALPHA);
-    rmsY = ema(rmsY, rawRmsY, EMA_ALPHA);
-    peakY = ema(peakY, rawPeakY, EMA_ALPHA);
+    topFreqX     = ema(topFreqX, rawFreqX, EMA_ALPHA);
+    rmsX         = ema(rmsX, rawRmsX, EMA_ALPHA);
+    peakX        = ema(peakX, rawPeakX, EMA_ALPHA);
+    topFreqY     = ema(topFreqY, rawFreqY, EMA_ALPHA);
+    rmsY         = ema(rmsY, rawRmsY, EMA_ALPHA);
+    peakY        = ema(peakY, rawPeakY, EMA_ALPHA);
 
     dataReady = true;
     measureCount++;
 }
 
-// ============================================
-// Reset EMA
-// ============================================
 void resetEMA() {
     for (int i = 0; i < NUM_TOP_FREQS; i++) topFreqsZ[i] = 0;
     rmsZ = 0; peakZ = 0; crestFactorZ = 0;
@@ -132,10 +113,8 @@ void resetEMA() {
     dataReady = false;
 }
 
-// ============================================
-// Build LoRa response
-// ============================================
 String buildResponse(unsigned long seqNum) {
+    // Format: DATA:id,seq,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert,f1x,rmsX,peakX,f1y,rmsY,peakY
     return "DATA:" + String(SLAVE_ID) + "," +
            String(seqNum) + "," +
            String(topFreqsZ[0], 2) + "," +
