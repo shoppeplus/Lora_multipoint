@@ -1,4 +1,4 @@
-# Bridge Vibration Monitor v3.2
+# Bridge Vibration Monitor
 
 Real-time structural health monitoring system for bridges using vibration analysis.
 
