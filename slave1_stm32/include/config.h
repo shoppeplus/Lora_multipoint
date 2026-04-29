@@ -6,7 +6,7 @@
 // ============================================
 
 // --- Slave ID (change per device: 1 or 2) ---
-#define SLAVE_ID 2
+#define SLAVE_ID 1
 
 // --- LoRa RA-02 (SX1278) — SPI1 ---
 #define LORA_SS PA4

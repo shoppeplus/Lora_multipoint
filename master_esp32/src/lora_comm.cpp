@@ -57,7 +57,9 @@ bool pollSlave(uint8_t slaveId) {
                         if (id == slaveId) {
                             if (commaCount == 14) {
                                 // v3.2: id,seq,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert,f1x,rmsX,peakX,f1y,rmsY,peakY
-                                slaves[idx].lastSeqRecv     = data.substring(commas[0] + 1, commas[1]).toInt();
+                                unsigned long respSeq = data.substring(commas[0] + 1, commas[1]).toInt();
+                                if (respSeq != globalSeqNum) continue; // Reject stale packet
+                                slaves[idx].lastSeqRecv     = respSeq;
                                 slaves[idx].topFreqsZ[0]    = data.substring(commas[1] + 1, commas[2]).toFloat();
                                 slaves[idx].topFreqsZ[1]    = data.substring(commas[2] + 1, commas[3]).toFloat();
                                 slaves[idx].topFreqsZ[2]    = data.substring(commas[3] + 1, commas[4]).toFloat();
@@ -73,7 +75,9 @@ bool pollSlave(uint8_t slaveId) {
                                 slaves[idx].peakY           = data.substring(commas[13] + 1).toFloat();
                             } else if (commaCount == 10) {
                                 // v3.0: id,seq,f1z,f2z,f3z,rmsZ,peakZ,cfZ,alert,rmsX,rmsY
-                                slaves[idx].lastSeqRecv     = data.substring(commas[0] + 1, commas[1]).toInt();
+                                unsigned long respSeq = data.substring(commas[0] + 1, commas[1]).toInt();
+                                if (respSeq != globalSeqNum) continue; // Reject stale packet
+                                slaves[idx].lastSeqRecv     = respSeq;
                                 slaves[idx].topFreqsZ[0]    = data.substring(commas[1] + 1, commas[2]).toFloat();
                                 slaves[idx].topFreqsZ[1]    = data.substring(commas[2] + 1, commas[3]).toFloat();
                                 slaves[idx].topFreqsZ[2]    = data.substring(commas[3] + 1, commas[4]).toFloat();
@@ -111,7 +115,12 @@ bool pollSlave(uint8_t slaveId) {
         }
     }
 
+    // Clear stale state when slave goes offline
     slaves[slaveId - 1].online = false;
+    slaves[slaveId - 1].slaveAlert = ALERT_NORMAL;
+    slaves[slaveId - 1].masterAlert = ALERT_NORMAL;
+    slaves[slaveId - 1].finalAlert = ALERT_NORMAL;
+    slaves[slaveId - 1].alertReasons = "";
     return false;
 }
 

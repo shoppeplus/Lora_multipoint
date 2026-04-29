@@ -81,6 +81,16 @@ body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans
 .btn-reset:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(124,58,237,0.3)}
 .btn-calib{background:linear-gradient(135deg,var(--accent),var(--accent3));color:#0a0e17}
 .btn-calib:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,212,255,0.3)}
+.chart-section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.chart-header h2{font-size:1em;font-weight:600;color:var(--txt)}
+.chart-tabs{display:flex;gap:4px}
+.chart-tab{padding:4px 12px;border-radius:6px;font-size:0.72em;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--txt2);transition:all 0.2s}
+.chart-tab.active{background:var(--accent);color:#0a0e17;border-color:var(--accent)}
+.chart-slave-sel{display:flex;gap:4px;align-items:center;font-size:0.78em;color:var(--txt2)}
+.chart-slave-sel select{background:var(--card2);color:var(--txt);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.9em}
+.chart-canvas{width:100%;height:200px;border-radius:8px;background:var(--card2)}
+.chart-info{display:flex;justify-content:space-between;margin-top:6px;font-size:0.7em;color:var(--txt2)}
 @media(max-width:600px){
 .slaves{grid-template-columns:1fr}
 .header h1{font-size:1em}
@@ -107,6 +117,21 @@ body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans
 <div class="stat"><div class="val" id="cycleRate" style="color:var(--accent)">-</div><div class="lbl">Cycle/min</div></div>
 </div>
 <div class="slaves" id="slavesContainer"></div>
+<div class="chart-section">
+<div class="chart-header">
+<h2>📈 History (1 hour)</h2>
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+<div class="chart-tabs">
+<button class="chart-tab active" onclick="setChart('rms')">RMS</button>
+<button class="chart-tab" onclick="setChart('peak')">Peak</button>
+<button class="chart-tab" onclick="setChart('freq')">Freq</button>
+</div>
+<div class="chart-slave-sel">Slave: <select id="chartSlave" onchange="loadHistory()"></select></div>
+</div>
+</div>
+<canvas class="chart-canvas" id="histChart"></canvas>
+<div class="chart-info"><span id="chartPts">-- points</span><span id="chartRange">--</span></div>
+</div>
 <div class="bottom-bar">
 <div class="info">
 <span id="baselineInfo">Baseline: --</span> |
@@ -260,8 +285,117 @@ update();
 }).catch(()=>alert('Lỗi kết nối!'));
 }
 }
+// === History Chart ===
+var chartMode='rms',chartPoints=[],lastFetchTime=0,chartMax=3600,chartInterval=1;
+function setChart(mode){
+chartMode=mode;
+document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+event.target.classList.add('active');
+renderChart();
+}
+function loadHistory(){
+let si=document.getElementById('chartSlave').value||0;
+let url='/api/history?slave='+si+'&since='+lastFetchTime;
+fetch(url).then(r=>r.json()).then(d=>{
+chartMax=d.max;chartInterval=d.interval;
+if(d.sent>0){
+// Append new points
+for(let p of d.points) chartPoints.push(p);
+// Update last fetch time
+lastFetchTime=chartPoints[chartPoints.length-1][0];
+// Trim: keep only last 1 hour
+let cutoff=lastFetchTime-3600;
+while(chartPoints.length>0&&chartPoints[0][0]<cutoff) chartPoints.shift();
+}
+let n=chartPoints.length;
+document.getElementById('chartPts').textContent=n+'/'+chartMax+' pts ('+chartInterval+'s) [+'+d.sent+']';
+if(n>1){
+let dur=chartPoints[n-1][0]-chartPoints[0][0];
+let m=Math.floor(dur/60),s=dur%60;
+document.getElementById('chartRange').textContent='Span: '+m+'m '+s+'s';
+} else {document.getElementById('chartRange').textContent='Waiting...';}
+renderChart();
+}).catch(()=>{});
+}
+function switchSlave(){
+chartPoints=[];lastFetchTime=0;loadHistory();
+}
+function renderChart(){
+if(chartPoints.length<2)return;
+let c=document.getElementById('histChart');
+let ctx=c.getContext('2d');
+let W=c.offsetWidth,H=c.offsetHeight;
+c.width=W*2;c.height=H*2;
+ctx.scale(2,2);
+ctx.clearRect(0,0,W,H);
+let pts=chartPoints;
+let ci=chartMode=='rms'?1:chartMode=='peak'?2:3;
+let vals=pts.map(p=>p[ci]);
+let mn=Math.min(...vals),mx=Math.max(...vals);
+if(mx==mn){mx=mn+0.001;}
+let pad={t:12,b:20,l:50,r:10};
+let gW=W-pad.l-pad.r,gH=H-pad.t-pad.b;
+// Grid
+ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
+for(let i=0;i<=4;i++){
+let y=pad.t+gH*(1-i/4);
+ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='9px sans-serif';ctx.textAlign='right';
+let v=mn+(mx-mn)*i/4;
+ctx.fillText(ci==3?v.toFixed(1):v.toFixed(4),pad.l-4,y+3);
+}
+// Time labels
+let t0=pts[0][0],tN=pts[pts.length-1][0],tR=tN-t0||1;
+ctx.fillStyle='rgba(255,255,255,0.3)';ctx.textAlign='center';
+for(let i=0;i<=4;i++){
+let t=t0+tR*i/4;
+let x=pad.l+gW*i/4;
+let m=Math.floor(t/60)%60,s=t%60;
+ctx.fillText(m+':'+(s<10?'0':'')+s,x,H-4);
+}
+// Line
+ctx.beginPath();
+let colors={rms:'56,189,248',peak:'239,68,68',freq:'6,214,160'};
+let clr=colors[chartMode]||'56,189,248';
+for(let i=0;i<pts.length;i++){
+let x=pad.l+gW*((pts[i][0]-t0)/tR);
+let y=pad.t+gH*(1-(vals[i]-mn)/(mx-mn));
+if(i==0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+}
+ctx.strokeStyle='rgb('+clr+')';ctx.lineWidth=1.5;ctx.stroke();
+// Fill
+ctx.lineTo(pad.l+gW,pad.t+gH);ctx.lineTo(pad.l,pad.t+gH);ctx.closePath();
+ctx.fillStyle='rgba('+clr+',0.08)';ctx.fill();
+// Alert dots
+for(let i=0;i<pts.length;i++){
+if(pts[i][4]>=2){
+let x=pad.l+gW*((pts[i][0]-t0)/tR);
+let y=pad.t+gH*(1-(vals[i]-mn)/(mx-mn));
+ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);
+ctx.fillStyle='#ef4444';ctx.fill();
+} else if(pts[i][4]==1){
+let x=pad.l+gW*((pts[i][0]-t0)/tR);
+let y=pad.t+gH*(1-(vals[i]-mn)/(mx-mn));
+ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);
+ctx.fillStyle='#fbbf24';ctx.fill();
+}
+}
+// Unit + latest value
+ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='bold 10px sans-serif';ctx.textAlign='left';
+let unit=chartMode=='freq'?'Hz':'g';
+let latest=vals[vals.length-1];
+ctx.fillText(unit+' | now: '+(ci==3?latest.toFixed(1):latest.toFixed(4)),pad.l+4,pad.t+10);
+}
+function initChartSlave(){
+let sel=document.getElementById('chartSlave');
+for(let i=0;i<2;i++){let o=document.createElement('option');o.value=i;o.textContent='S'+(i+1);sel.appendChild(o);}
+sel.onchange=function(){switchSlave();};
+}
+initChartSlave();
 update();
 setInterval(update,1000);
+loadHistory();
+setInterval(loadHistory,2000);
 </script>
 </body>
 </html>

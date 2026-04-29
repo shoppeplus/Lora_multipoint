@@ -55,6 +55,11 @@
 #define NTP_GMT_OFFSET     25200   // UTC+7
 #define NTP_DAYLIGHT       0
 
+// --- History Ring Buffer (RAM) ---
+// 900 × 4s = 3600s = 1 hour | 900 × 20B × 2 slaves = 36KB
+#define HISTORY_MAX        900
+#define HISTORY_INTERVAL_S 4       // Record every 4 seconds
+
 // --- Serial ---
 #define SERIAL_BAUD        115200
 

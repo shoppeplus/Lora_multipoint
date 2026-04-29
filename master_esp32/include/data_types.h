@@ -35,4 +35,14 @@ struct BaselineData {
     float peak_mean, peak_std;
 };
 
+// 20 bytes per point — compact for ring buffer
+struct HistoryPoint {
+    uint32_t timeSec;       // Uptime in seconds
+    float    rmsZ;          // RMS vibration (g)
+    float    peakZ;         // Peak vibration (g)
+    float    freqZ;         // Dominant frequency (Hz)
+    uint8_t  alert;         // Alert level (0/1/2)
+    uint8_t  _pad[3];       // Alignment padding
+};
+
 #endif

@@ -9,14 +9,23 @@ const char* axisNames[] = {"X", "Y", "Z"};
 
 void calibrateOrientation() {
     float sum[3] = {0, 0, 0};
+    int validCount = 0;
 
     for (int i = 0; i < CALIB_SAMPLES; i++) {
         float ax, ay, az;
-        readAccelXYZ(ax, ay, az);
-        sum[0] += ax;
-        sum[1] += ay;
-        sum[2] += az;
+        if (readAccelXYZ(ax, ay, az)) {
+            sum[0] += ax;
+            sum[1] += ay;
+            sum[2] += az;
+            validCount++;
+        }
         delay(5);
+    }
+
+    if (validCount == 0) {
+        Serial.println("[CALIB] ERROR: No valid I2C reads! Using default Z");
+        gravAxis = 2; horzAxis1 = 0; horzAxis2 = 1;
+        return;
     }
 
     float mean[3];
@@ -24,7 +33,7 @@ void calibrateOrientation() {
     int maxAxis = 2;
 
     for (int i = 0; i < 3; i++) {
-        mean[i] = sum[i] / CALIB_SAMPLES;
+        mean[i] = sum[i] / validCount;
         float absMean = fabsf(mean[i]);
         if (absMean > absMax) {
             absMax = absMean;

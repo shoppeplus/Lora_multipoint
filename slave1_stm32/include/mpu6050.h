@@ -6,6 +6,6 @@
 #include "config.h"
 
 void mpuInit();
-void readAccelXYZ(float &ax, float &ay, float &az);
+bool readAccelXYZ(float &ax, float &ay, float &az);
 
 #endif

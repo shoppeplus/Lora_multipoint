@@ -23,4 +23,10 @@ extern bool calibDone;
 extern int calibAckCount;
 extern String calibResult;
 
+// History ring buffer (1 hour, auto-overwrite)
+extern HistoryPoint history[NUM_SLAVES][HISTORY_MAX];
+extern int historyHead[NUM_SLAVES];
+extern int historyCount[NUM_SLAVES];
+extern unsigned long lastHistoryTime;
+
 #endif

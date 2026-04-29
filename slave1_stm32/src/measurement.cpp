@@ -39,16 +39,23 @@ void collectSamples() {
     for (int i = 0; i < SAMPLE_SIZE; i++) {
         unsigned long t = micros();
         float ax, ay, az;
-        readAccelXYZ(ax, ay, az);
-        float raw[3] = {ax, ay, az};
-
+        if (readAccelXYZ(ax, ay, az)) {
+            float raw[3] = {ax, ay, az};
 #if ENABLE_MULTI_AXIS
-        samples[i]  = raw[gravAxis];
-        samplesX[i] = raw[horzAxis1];
-        samplesY[i] = raw[horzAxis2];
+            samples[i]  = raw[gravAxis];
+            samplesX[i] = raw[horzAxis1];
+            samplesY[i] = raw[horzAxis2];
 #else
-        samples[i] = raw[gravAxis];
+            samples[i] = raw[gravAxis];
 #endif
+        } else {
+            // I2C error: repeat previous sample to avoid garbage
+            samples[i]  = (i > 0) ? samples[i - 1] : 0;
+#if ENABLE_MULTI_AXIS
+            samplesX[i] = (i > 0) ? samplesX[i - 1] : 0;
+            samplesY[i] = (i > 0) ? samplesY[i - 1] : 0;
+#endif
+        }
         while ((micros() - t) < sampleInterval) {}
     }
 }

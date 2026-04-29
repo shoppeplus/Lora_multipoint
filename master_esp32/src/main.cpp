@@ -110,6 +110,24 @@ void loop() {
         }
     }
 
+    // Record history (ring buffer, auto-overwrites after HISTORY_MAX)
+    unsigned long nowSec = millis() / 1000;
+    if (nowSec - lastHistoryTime >= HISTORY_INTERVAL_S) {
+        lastHistoryTime = nowSec;
+        for (int i = 0; i < NUM_SLAVES; i++) {
+            if (slaves[i].online) {
+                HistoryPoint& pt = history[i][historyHead[i]];
+                pt.timeSec = nowSec;
+                pt.rmsZ    = slaves[i].rmsZ;
+                pt.peakZ   = slaves[i].peakZ;
+                pt.freqZ   = slaves[i].topFreqsZ[0];
+                pt.alert   = (uint8_t)slaves[i].finalAlert;
+                historyHead[i] = (historyHead[i] + 1) % HISTORY_MAX;
+                if (historyCount[i] < HISTORY_MAX) historyCount[i]++;
+            }
+        }
+    }
+
     printResults();
     delay(POLL_INTERVAL_MS);
 }

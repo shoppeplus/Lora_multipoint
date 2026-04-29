@@ -52,6 +52,10 @@ void resetBaselineData() {
     for (int i = 0; i < NUM_SLAVES; i++) {
         baselines[i].count = 0;
         baselines[i].ready = false;
+        // Clear stale alerts from previous baseline
+        slaves[i].masterAlert = ALERT_NORMAL;
+        slaves[i].finalAlert = slaves[i].slaveAlert;
+        slaves[i].alertReasons = "";
     }
     prefs.begin("baseline", false);
     prefs.clear();
